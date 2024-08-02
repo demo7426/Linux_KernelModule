@@ -19,7 +19,7 @@ Copyright (C), 2009-2012    , Level Chip Co., Ltd.
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 
-#define RTn_FAILURE -2                      //失败
+#define RTN_FAILURE -2                      //失败
 #define RTN_SUCCESS 0                       //成功
 
 
@@ -97,9 +97,15 @@ static int VirtualNIC_Stop(struct net_device *_pDev)
 
 static netdev_tx_t VirtualNIC_Start_Xmit(struct sk_buff *_pSkB, struct net_device *_pDev)
 {
+    //处理数据包的逻辑（例如发送到硬件）
+
+    //处理完后释放数据包
     dev_kfree_skb(_pSkB);
 
-    printk(KERN_INFO "VirtualNIC_Start_Xmit success.\n");
+    _pDev->stats.tx_packets++;
+    _pDev->stats.tx_bytes += _pSkB->len;
+
+    printk(KERN_INFO "VirtualNIC_Start_Xmit success protocol = %u, tx_packets = %u, tx_bytes = %u.\n", _pSkB->protocol, _pDev->stats.tx_packets, _pDev->stats.tx_bytes);
     return NETDEV_TX_OK;
 }
 
@@ -118,6 +124,9 @@ void VirtualNIC_SetProperty(struct net_device *_pDev)
     //设置网络设备的私有数据和其他属性
     ether_setup(_pDev);
     _pDev->netdev_ops = &tNetDevOps;
+
+    _pDev->flags |= IFF_NOARP;
+    _pDev->features |= NETIF_F_HW_CSUM;
 }
 
 module_init(VirtualNIC_Init);
