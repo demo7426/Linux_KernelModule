@@ -12,18 +12,25 @@ Copyright (C), 2009-2012    , Level Chip Co., Ltd.
 		  1) 此为模板第一个版本；
 	  版本:V1.0.0
 
+  2.  日期: 2024.08.02
+	  作者: 钱锐
+	  内容:
+		  1) 新增支持借用现有的以太网设备发送数据包，前提是真实以太网卡是可以正常收发数据的；
+          2) 只测试通过了 Test.elf 程序，及发送UDP包
+	  版本:V1.0.0
 *************************************************/
 
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 
 #define RTN_FAILURE -2                      //失败
 #define RTN_SUCCESS 0                       //成功
 
-
-static struct net_device *g_ptNetDev = NULL;
+static char* g_pchRealNICName = NULL;                               //真实网卡名称
+static struct net_device *g_ptNetDev = NULL;                        //虚拟网络设备信息             
 
 /// @brief 打开虚拟网卡
 /// @param _pDev 
@@ -45,12 +52,18 @@ static netdev_tx_t VirtualNIC_Start_Xmit(struct sk_buff *_pSkB, struct net_devic
 /// @param _pDev 
 static void VirtualNIC_SetProperty(struct net_device *_pDev);
 
+/// @brief 设置mac地址
+/// @param _pDev 
+/// @return 
+static int VirtualNIC_SetMacAddress(struct net_device *_pDev, void *_pAddr);
+
 
 static struct net_device_ops tNetDevOps = 
 {
     .ndo_open = VirtualNIC_Open,
     .ndo_stop = VirtualNIC_Stop,
     .ndo_start_xmit = VirtualNIC_Start_Xmit,
+    .ndo_set_mac_address = VirtualNIC_SetMacAddress,
 };
 
 /// @brief 虚拟网卡设备初始化操作
@@ -98,9 +111,22 @@ static int VirtualNIC_Stop(struct net_device *_pDev)
 static netdev_tx_t VirtualNIC_Start_Xmit(struct sk_buff *_pSkB, struct net_device *_pDev)
 {
     //处理数据包的逻辑（例如发送到硬件）
+    
+    struct net_device *ptNetDev = NULL;
 
-    //处理完后释放数据包
-    dev_kfree_skb(_pSkB);
+    ptNetDev = dev_get_by_name(&init_net, g_pchRealNICName);
+    if(!ptNetDev)
+    {
+        //处理完后释放数据包
+        dev_kfree_skb(_pSkB);
+        printk(KERN_ERR "VirtualNIC_Start_Xmit dev_get_by_name err.\n");
+        return NETDEV_TX_OK;
+    }
+
+    _pSkB->dev = ptNetDev;                  //改变 _pSkb 的设备未实际的以太网设备 
+
+    dev_queue_xmit(_pSkB);                  //发送数据包    
+    dev_put(ptNetDev);                      //释放对真实nic设备的引用
 
     _pDev->stats.tx_packets++;
     _pDev->stats.tx_bytes += _pSkB->len;
@@ -122,12 +148,29 @@ static void __exit VirtualNIC_Exit(void)
 void VirtualNIC_SetProperty(struct net_device *_pDev)
 {
     //设置网络设备的私有数据和其他属性
-    ether_setup(_pDev);
-    _pDev->netdev_ops = &tNetDevOps;
+    
+    ether_setup(_pDev);                     //设置以太网设备的默认值
 
+    _pDev->netdev_ops = &tNetDevOps;
     _pDev->flags |= IFF_NOARP;
     _pDev->features |= NETIF_F_HW_CSUM;
+    random_ether_addr(_pDev->dev_addr);
 }
+
+static int VirtualNIC_SetMacAddress(struct net_device *_pDev, void *_pAddr)
+{
+    struct sockaddr *ptSockAddr = _pAddr;
+    if(!is_valid_ether_addr(ptSockAddr->sa_data))               //设置虚拟网卡mac地址
+    {
+        printk(KERN_ERR "VirtualNIC_SetMacAddress is_valid_ether_addr err.\n");
+        return -EADDRNOTAVAIL;
+    }
+
+    memcpy(_pDev->dev_addr, ptSockAddr->sa_data, _pDev->addr_len);
+    return RTN_SUCCESS;
+}
+
+module_param(g_pchRealNICName, charp, S_IRUGO);                                     //用于命令窗口设置真实网卡名称
 
 module_init(VirtualNIC_Init);
 module_exit(VirtualNIC_Exit);

@@ -1,3 +1,11 @@
+/*
+ * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
+ * @Date: 2024-08-02 11:24:58
+ * @LastEditors: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
+ * @LastEditTime: 2024-08-02 20:21:13
+ * @FilePath: /alientek/Project/Linux_KernelModule/04_VirtualNIC/Test.cpp
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 // /*************************************************
 // Copyright (C), 2009-2012    , Level Chip Co., Ltd.
 // 文件名:	Test.c
@@ -24,7 +32,7 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 
-#define SERVER_IP "192.168.9.19"
+#define SERVER_IP "10.0.0.226"
 #define SERVER_PORT 8888
 #define IFNAME "vnic0"
 #define BUFFER_SIZE 1024
