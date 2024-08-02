@@ -158,3 +158,5 @@ void DealShellCmd(char* _pCmd)
 module_init(CharDev_Init);
 module_exit(CharDev_Exit);
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("qianrui");
