@@ -1,1 +1,0 @@
-cmd_/home/qianrui/qianrui/Linux_KernelModule/04_VirtualNIC/04_VirtualNIC.mod := { echo  /home/qianrui/qianrui/Linux_KernelModule/04_VirtualNIC/04_VirtualNIC.o;  echo; } > /home/qianrui/qianrui/Linux_KernelModule/04_VirtualNIC/04_VirtualNIC.mod
