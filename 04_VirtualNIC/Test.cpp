@@ -32,7 +32,7 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 
-#define SERVER_IP "10.0.0.226"
+#define SERVER_IP "192.168.2.6"
 #define SERVER_PORT 8888
 #define IFNAME "vnic0"
 #define BUFFER_SIZE 1024
@@ -42,6 +42,7 @@ int main() {
     struct sockaddr_in server_addr;
     struct ifreq ifr;
     char buffer[BUFFER_SIZE];
+    unsigned int unFreq = 0;
 
     // 创建UDP socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -71,15 +72,15 @@ int main() {
 	while (1)
 	{
 		// 发送消息到服务器
-    	snprintf(buffer, BUFFER_SIZE, "Hello from vnet0!");
+    	snprintf(buffer, BUFFER_SIZE, "Hello from vnet0, unFreq = %u", ++unFreq);
 		if (sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
 			perror("sendto failed");
 			close(sockfd);
 			exit(EXIT_FAILURE);
 		}
 
-		printf("Message sent to %s:%d via %s\n", SERVER_IP, SERVER_PORT, IFNAME);	
-		usleep(1000000);
+		printf("Message sent to %s:%d via %s unFreq = %u\n", SERVER_IP, SERVER_PORT, IFNAME, unFreq);	
+		usleep(100000);
 	}
 	
 

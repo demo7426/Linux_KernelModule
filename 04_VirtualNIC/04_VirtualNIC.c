@@ -26,6 +26,11 @@ Copyright (C), 2009-2012    , Level Chip Co., Ltd.
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 
+#include <linux/skbuff.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/icmp.h>
+
 #define RTN_FAILURE -2                      //失败
 #define RTN_SUCCESS 0                       //成功
 
@@ -57,6 +62,11 @@ static void VirtualNIC_SetProperty(struct net_device *_pDev);
 /// @return 
 static int VirtualNIC_SetMacAddress(struct net_device *_pDev, void *_pAddr);
 
+/// @brief 实现ICMP的接收和发送
+/// @param _pSkB 
+/// @param _pDev 
+/// @return 
+static int VirtualNIC_ICMP(struct sk_buff *_pSkB, struct net_device *_pDev);
 
 static struct net_device_ops tNetDevOps = 
 {
@@ -112,6 +122,15 @@ static netdev_tx_t VirtualNIC_Start_Xmit(struct sk_buff *_pSkB, struct net_devic
 {
     //处理数据包的逻辑（例如发送到硬件）
     
+    if(VirtualNIC_ICMP(_pSkB, _pDev) == NETDEV_TX_OK)                               //ICMP包如果成功发送，后续就不需要再使用实际的网卡传输数据了
+        return NETDEV_TX_OK;
+
+    if(g_pchRealNICName == NULL)
+    {
+        printk(KERN_ERR "VirtualNIC_Start_Xmit g_pchRealNICName err.\n");
+        return NETDEV_TX_OK;
+    }
+
     struct net_device *ptNetDev = NULL;
 
     ptNetDev = dev_get_by_name(&init_net, g_pchRealNICName);
@@ -168,6 +187,64 @@ static int VirtualNIC_SetMacAddress(struct net_device *_pDev, void *_pAddr)
 
     memcpy(_pDev->dev_addr, ptSockAddr->sa_data, _pDev->addr_len);
     return RTN_SUCCESS;
+}
+
+static int VirtualNIC_ICMP(struct sk_buff *_pSkB, struct net_device *_pDev)
+{
+    struct ethhdr *eth;
+    struct iphdr *ip;
+    struct icmphdr *icmp;
+    struct sk_buff *rx_skb;
+
+    eth = (struct ethhdr *)skb_mac_header(_pSkB);
+    ip = (struct iphdr *)(_pSkB->data + sizeof(struct ethhdr));
+    icmp = (struct icmphdr *)(_pSkB->data + sizeof(struct ethhdr) + (ip->ihl * 4));
+
+    if (ntohs(eth->h_proto) == ETH_P_IP && ip->protocol == IPPROTO_ICMP) 
+    {
+        if (icmp->type == ICMP_ECHO) 
+        {
+            printk(KERN_INFO "%s: ICMP Echo Request received\n", "vnic0");
+
+            // 创建用于接收的 skb
+            rx_skb = dev_alloc_skb(_pSkB->len);
+            if (!rx_skb) 
+            {
+                dev_kfree_skb(_pSkB);
+                return NETDEV_TX_OK;
+            }
+
+            // 拷贝原始数据
+            skb_put_data(rx_skb, _pSkB->data, _pSkB->len);
+
+            // 修改 ICMP 报头类型为 Echo Reply
+            icmp = (struct icmphdr *)(rx_skb->data + sizeof(struct ethhdr) + (ip->ihl * 4));
+            icmp->type = ICMP_ECHOREPLY;
+
+            // 交换 IP 地址
+            ip = (struct iphdr *)(rx_skb->data + sizeof(struct ethhdr));
+            __be32 tmp_ip = ip->saddr;
+            ip->saddr = ip->daddr;
+            ip->daddr = tmp_ip;
+
+            // 交换 MAC 地址
+            eth = (struct ethhdr *)rx_skb->data;
+            memcpy(eth->h_dest, eth->h_source, ETH_ALEN);
+            memcpy(eth->h_source, _pDev->dev_addr, ETH_ALEN);
+
+            // 更新 skb 元数据
+            rx_skb->dev = _pDev;
+            rx_skb->protocol = eth_type_trans(rx_skb, _pDev);
+            netif_rx(rx_skb);
+
+            _pDev->stats.rx_packets++;
+            _pDev->stats.rx_bytes += rx_skb->len;
+
+            // dev_kfree_skb(_pSkB);
+            return NETDEV_TX_OK;
+        }
+    }
+    return NETDEV_TX_BUSY;
 }
 
 module_param(g_pchRealNICName, charp, S_IRUGO);                                     //用于命令窗口设置真实网卡名称
