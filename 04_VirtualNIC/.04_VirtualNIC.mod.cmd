@@ -1,1 +1,0 @@
-cmd_/home/alientek/Project/Linux_KernelModule/04_VirtualNIC/04_VirtualNIC.mod := { echo  /home/alientek/Project/Linux_KernelModule/04_VirtualNIC/04_VirtualNIC.o;  echo; } > /home/alientek/Project/Linux_KernelModule/04_VirtualNIC/04_VirtualNIC.mod
